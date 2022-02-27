@@ -2,7 +2,7 @@ package com.paradigma.rt.streaming.fraudsimulator.api.async;
 
 import com.paradigma.rt.streaming.fraudsimulator.api.rest.dto.StartFraudSimulationDTO;
 import com.paradigma.rt.streaming.fraudsimulator.business.FraudSimulator;
-import com.paradigma.rt.streaming.fraudsimulator.model.SimulationData;
+import com.paradigma.rt.streaming.fraudsimulator.business.model.SimulationData;
 import io.smallrye.common.annotation.Blocking;
 import io.smallrye.mutiny.Uni;
 import org.eclipse.microprofile.reactive.messaging.Acknowledgment;

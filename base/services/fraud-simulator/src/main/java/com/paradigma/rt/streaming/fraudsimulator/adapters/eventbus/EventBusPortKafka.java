@@ -1,9 +1,10 @@
 package com.paradigma.rt.streaming.fraudsimulator.adapters.eventbus;
 
 import com.paradigma.rt.streaming.fraudsimulator.adapters.eventbus.dto.*;
+import com.paradigma.rt.streaming.fraudsimulator.business.FraudSimulator;
 import com.paradigma.rt.streaming.fraudsimulator.business.ports.eventbus.EventBusPort;
-import com.paradigma.rt.streaming.fraudsimulator.model.SimulationData;
-import com.paradigma.rt.streaming.fraudsimulator.model.SimulationDataResults;
+import com.paradigma.rt.streaming.fraudsimulator.business.model.SimulationData;
+import com.paradigma.rt.streaming.fraudsimulator.business.model.SimulationDataResults;
 import org.eclipse.microprofile.reactive.messaging.Channel;
 import org.eclipse.microprofile.reactive.messaging.Emitter;
 import org.eclipse.microprofile.reactive.messaging.Message;
@@ -69,7 +70,7 @@ public class EventBusPortKafka implements EventBusPort {
      */
     @Override
     public void publishATMMovement(String card, String atm, float amount, long processId, int iteration) {
-        String id = generateIdMovement("atm", card, processId, iteration);
+        String id = generateIdMovement(FraudSimulator.ATM_PREFIX, card, processId, iteration);
         this.atmMovementEmitter.send(Message.of(ATMMovementDTO.builder()
                 .atm(atm)
                 .card(card)
@@ -89,7 +90,7 @@ public class EventBusPortKafka implements EventBusPort {
      */
     @Override
     public void publishMerchantMovement(String card, String merchant, float amount, long processId, int iteration) {
-        String id = generateIdMovement("merchant", card, processId, iteration);
+        String id = generateIdMovement(FraudSimulator.MERCHANT_PREFIX, card, processId, iteration);
         this.merchantMovementEmitter.send(Message.of(MerchantMovementDTO.builder()
                 .merchant(merchant)
                 .card(card)
@@ -109,7 +110,7 @@ public class EventBusPortKafka implements EventBusPort {
      */
     @Override
     public void publishOnlineMovement(String card, String site, float amount, long processId, int iteration) {
-        String id = generateIdMovement("online", card, processId, iteration);
+        String id = generateIdMovement(FraudSimulator.ONLINE_PREFIX, card, processId, iteration);
         this.onlineMovementEmitter.send(Message.of(OnlineMovementDTO.builder()
                 .site(site)
                 .card(card)
@@ -121,6 +122,6 @@ public class EventBusPortKafka implements EventBusPort {
     }
 
     private String generateIdMovement(String type, String card, long processId, int iteration) {
-        return processId + "-" + iteration + "-" + type + "-" + card;
+        return type + processId + iteration + "-" + card;
     }
 }

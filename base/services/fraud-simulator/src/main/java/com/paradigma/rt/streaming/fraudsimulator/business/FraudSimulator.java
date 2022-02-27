@@ -1,8 +1,8 @@
 package com.paradigma.rt.streaming.fraudsimulator.business;
 
 import com.paradigma.rt.streaming.fraudsimulator.business.ports.eventbus.EventBusPort;
-import com.paradigma.rt.streaming.fraudsimulator.model.SimulationData;
-import com.paradigma.rt.streaming.fraudsimulator.model.SimulationDataResults;
+import com.paradigma.rt.streaming.fraudsimulator.business.model.SimulationData;
+import com.paradigma.rt.streaming.fraudsimulator.business.model.SimulationDataResults;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.tuples.Tuple;
 import org.jboss.logging.Logger;
@@ -22,6 +22,10 @@ import java.util.stream.IntStream;
 public class FraudSimulator {
 
     public static final int FRAUDS_MOVEMENTS_PER_CARD = 5;
+    public static final String POTENTIAL_FRAUD_SITE_PREFIX = "fraud-";
+    public static final String MERCHANT_PREFIX = "merchant-";
+    public static final String ATM_PREFIX = "atm-";
+    public static final String ONLINE_PREFIX = "online-";
     private final Logger logger = Logger.getLogger(FraudSimulator.class);
 
     @Inject
@@ -97,7 +101,6 @@ public class FraudSimulator {
         Uni<Integer> multipleMerchant = Uni.createFrom().item(() ->this.multipleMerchantMovements(card, processId, iteration)).runSubscriptionOn(this.executor);
         Uni<Integer> multipleOnline = Uni.createFrom().item(() -> this.multipleOnlineMovements(card, processId, iteration)).runSubscriptionOn(this.executor);
         Uni<Integer> suspiciousOnline = Uni.createFrom().item(() -> this.onlineMovementFromSuspiciousSite(card, processId, iteration)).runSubscriptionOn(this.executor);
-//        Uni<Integer> merchantAndAtm = Uni.createFrom().item(() -> this.merchantAndATMMovement(card)).runSubscriptionOn(this.executor);
 
         Tuple res = Uni.combine().all()
                 .unis(multipleATM, multipleMerchant, multipleOnline, suspiciousOnline)
@@ -120,7 +123,7 @@ public class FraudSimulator {
     private int multipleATMMovements(String card, long processId, int iteration) {
         int total = 0;
         for (int i=0; i<3; i++) {
-            this.eventBusPort.publishATMMovement(card, "atm-" + (i+1), 100f * (i+1), processId, iteration);
+            this.eventBusPort.publishATMMovement(card, ATM_PREFIX + (i+1), 100f * (i+1), processId, iteration);
             this.sleep(2000,500);
             total++;
         }
@@ -134,7 +137,7 @@ public class FraudSimulator {
     private int multipleMerchantMovements(String card, long processId, int iteration)  {
         int total = 0;
         for (int i=0; i<2; i++) {
-            this.eventBusPort.publishMerchantMovement(card, "merchant-" + (i+1), 100f * (i+1), processId, iteration);
+            this.eventBusPort.publishMerchantMovement(card, MERCHANT_PREFIX + (i+1), 100f * (i+1), processId, iteration);
             this.sleep(2000,500);
             total++;
         }
@@ -150,8 +153,8 @@ public class FraudSimulator {
         float initAmount = 30f;
         int total = 0;
 
-        for (int i = 0; i< FRAUDS_MOVEMENTS_PER_CARD; i++) {
-            this.eventBusPort.publishOnlineMovement(card, "online" + (i+1), (i+1) * initAmount, processId, iteration);
+        for (int i = 0; i< 4; i++) {
+            this.eventBusPort.publishOnlineMovement(card, ONLINE_PREFIX + (i+1), (i+1) * initAmount, processId, iteration);
             this.sleep(2000, 500);
             total++;
         }
@@ -163,17 +166,9 @@ public class FraudSimulator {
      * @param card
      */
     private int onlineMovementFromSuspiciousSite(String card, long processId, int iteration) {
-        this.eventBusPort.publishOnlineMovement(card, "fraud-1", 100f, processId, iteration);
+        this.eventBusPort.publishOnlineMovement(card, POTENTIAL_FRAUD_SITE_PREFIX + processId, 100f, processId, iteration);
         return 1;
     }
-
-//    private int merchantAndATMMovement(String card) {
-//        this.publishMerchantMovement(card, "merchant-1", 100f);
-//        this.sleep(2000, 1000);
-//        this.publishATMMovement(card, "atm-1", 200f);
-//
-//        return 2;
-//    }
 
     private void sleep(int max, int min) {
         Random random = new Random();

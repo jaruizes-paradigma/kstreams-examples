@@ -3,7 +3,7 @@ package com.paradigma.rt.streaming.fraudsimulator.api.rest;
 import com.paradigma.rt.streaming.fraudsimulator.api.rest.dto.StartFraudSimulationDTO;
 import com.paradigma.rt.streaming.fraudsimulator.api.rest.dto.StartFraudSimulationResponseDTO;
 import com.paradigma.rt.streaming.fraudsimulator.business.FraudSimulator;
-import com.paradigma.rt.streaming.fraudsimulator.model.SimulationData;
+import com.paradigma.rt.streaming.fraudsimulator.business.model.SimulationData;
 import org.jboss.logging.Logger;
 
 import javax.inject.Inject;

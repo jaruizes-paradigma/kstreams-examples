@@ -1,7 +1,7 @@
 package com.paradigma.rt.streaming.fraudsimulator.business.ports.eventbus;
 
-import com.paradigma.rt.streaming.fraudsimulator.model.SimulationData;
-import com.paradigma.rt.streaming.fraudsimulator.model.SimulationDataResults;
+import com.paradigma.rt.streaming.fraudsimulator.business.model.SimulationData;
+import com.paradigma.rt.streaming.fraudsimulator.business.model.SimulationDataResults;
 
 public interface EventBusPort {
 

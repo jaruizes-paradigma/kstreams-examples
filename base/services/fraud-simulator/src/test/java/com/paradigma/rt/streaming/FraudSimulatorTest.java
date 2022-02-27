@@ -44,9 +44,6 @@ public class FraudSimulatorTest {
     @ConfigProperty(name = "mp.messaging.outgoing.datagen-fraudsimulator-results.topic")
     String fraudSimulatorResultsTopic;
 
-    @Inject
-    FraudSimulator fraudSimulator;
-
     KafkaConsumer<String, ATMMovementDTO> atmConsumer;
     KafkaConsumer<String, OnlineMovementDTO> onlineConsumer;
     KafkaConsumer<String, MerchantMovementDTO> merchantConsumer;
@@ -78,41 +75,58 @@ public class FraudSimulatorTest {
     }
 
     @Test
-    public void testSimulator() {
-        final StartFraudSimulationDTO startFraudSimulationDTO = StartFraudSimulationDTO.builder()
-                .cards(4)
-                .iterations(2)
-                .msBetweenIterations(10000)
-                .build();
+    public void testFraudSimulator() {
+        final StartFraudSimulationDTO startFraudSimulationDTO = this.buildRequestObject();
+        final StartFraudSimulationResponseDTO response = this.callRestAPItoStartFraudSimulatorProcess(startFraudSimulationDTO);
 
-        StartFraudSimulationResponseDTO response =
-                given()
-                    .body(startFraudSimulationDTO)
-                    .contentType("application/json")
-                .when()
-                    .post("/fraud-process-simulation")
-                    .then()
-                    .statusCode(201)
-                    .extract()
-                    .as(StartFraudSimulationResponseDTO.class);
-        // Then
         // Id should be generated and Id is greater than 0
         Assertions.assertNotNull(response);
         Assertions.assertTrue(response.getId() > 0);
 
+        // Checking topics to validate that everything is generated
+        this.checkDataInputTopic(startFraudSimulationDTO, response.getId());
+        final SimulationDataResultsDTO resultsDTO = this.checkResultsTopic(startFraudSimulationDTO, response.getId());
+        this.checkMovementsTopics(resultsDTO.getMovementsGenerated());
+    }
+
+    private StartFraudSimulationDTO buildRequestObject() {
+        return StartFraudSimulationDTO.builder()
+                .cards(4)
+                .iterations(2)
+                .msBetweenIterations(10000)
+                .build();
+    }
+
+    private StartFraudSimulationResponseDTO callRestAPItoStartFraudSimulatorProcess(StartFraudSimulationDTO startFraudSimulationDTO) {
+        return given()
+                .body(startFraudSimulationDTO)
+                .contentType("application/json")
+                .when()
+                .post("/fraud-process-simulation")
+                .then()
+                .statusCode(201)
+                .extract()
+                .as(StartFraudSimulationResponseDTO.class);
+    }
+
+    private SimulationDataDTO checkDataInputTopic(StartFraudSimulationDTO startFraudSimulationDTO, long processId) {
         // There should be exactly one message in topic associated to simulation data input
         ConsumerRecords<String, SimulationDataDTO> simulationData = fraudSimulatorConsumer.poll(Duration.ofSeconds(10));
         Assertions.assertEquals(1, simulationData.count());
 
         final SimulationDataDTO simulationDataDTO = simulationData.iterator().next().value();
         // Id should be equals to response id
-        Assertions.assertEquals(response.getId(), simulationDataDTO.getId());
+        Assertions.assertEquals(processId, simulationDataDTO.getId());
 
         // Cards, iterations and time between iterations should be equals to the initial object (POST request)
         Assertions.assertEquals(startFraudSimulationDTO.getCards(), simulationDataDTO.getCards());
         Assertions.assertEquals(startFraudSimulationDTO.getIterations(), simulationDataDTO.getIterations());
         Assertions.assertEquals(startFraudSimulationDTO.getMsBetweenIterations(), simulationDataDTO.getMsBetweenIterations());
 
+        return simulationDataDTO;
+    }
+
+    private SimulationDataResultsDTO checkResultsTopic(StartFraudSimulationDTO startFraudSimulationDTO, long processId) {
         ConsumerRecords<String, SimulationDataResultsDTO> simulationDataResultsRecords = fraudSimulatorResultsConsumer.poll(Duration.ofSeconds(60));
 
         // There should be exactly one message in topic associated to simulation data results
@@ -120,7 +134,7 @@ public class FraudSimulatorTest {
 
         final SimulationDataResultsDTO resultsDTO = simulationDataResultsRecords.iterator().next().value();
         // Id should be equals to response id
-        Assertions.assertEquals(response.getId(), resultsDTO.getId());
+        Assertions.assertEquals(processId, resultsDTO.getId());
 
         // Cards, iterations and time between iterations should be equals to the initial object (POST request)
         Assertions.assertEquals(startFraudSimulationDTO.getCards(), resultsDTO.getCards());
@@ -128,13 +142,32 @@ public class FraudSimulatorTest {
         Assertions.assertEquals(startFraudSimulationDTO.getMsBetweenIterations(), resultsDTO.getMsBetweenIterations());
         Assertions.assertEquals(FraudSimulator.calculatePotentialFraudsMovements(resultsDTO.getCards(), resultsDTO.getIterations()), resultsDTO.getPotentialFraudMovements());
 
+        return resultsDTO;
+    }
+
+    private void checkMovementsTopics(int movementsGenerated) {
         ConsumerRecords<String, ATMMovementDTO> atmMovements = atmConsumer.poll(Duration.ofSeconds(60));
         ConsumerRecords<String, OnlineMovementDTO> onlineMovements = onlineConsumer.poll(Duration.ofSeconds(60));
         ConsumerRecords<String, MerchantMovementDTO> merchantMovements = merchantConsumer.poll(Duration.ofSeconds(60));
         int totalMessagesInMovementsTopics = atmMovements.count() + onlineMovements.count() + merchantMovements.count();
-        Assertions.assertEquals(totalMessagesInMovementsTopics, resultsDTO.getMovementsGenerated());
+        Assertions.assertEquals(totalMessagesInMovementsTopics, movementsGenerated);
 
-
+        atmMovements.records(atmMovementsTopic).forEach((m) -> {
+            Assertions.assertTrue(m.value().getAtm().startsWith(FraudSimulator.ATM_PREFIX));
+            Assertions.assertTrue(m.value().getId().startsWith(FraudSimulator.ATM_PREFIX));
+        });
+        merchantMovements.records(merchantMovementsTopic).forEach((m) -> {
+            Assertions.assertTrue(m.value().getMerchant().startsWith(FraudSimulator.MERCHANT_PREFIX));
+            Assertions.assertTrue(m.value().getId().startsWith(FraudSimulator.MERCHANT_PREFIX));
+        });
+        onlineMovements.records(onlineMovementsTopic).forEach((m) -> {
+            String site = m.value().getSite();
+            Assertions.assertTrue(
+                    (site.startsWith(FraudSimulator.ONLINE_PREFIX)) ||
+                    (site.startsWith(FraudSimulator.POTENTIAL_FRAUD_SITE_PREFIX))
+            );
+            Assertions.assertTrue(m.value().getId().startsWith(FraudSimulator.ONLINE_PREFIX));
+        });
     }
 
     private Properties consumerProps(String groupId) {
@@ -143,12 +176,6 @@ public class FraudSimulatorTest {
         props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        return props;
-    }
-
-    private Properties adminProps() {
-        Properties props = new Properties();
-        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KafkaResource.getBootstrapServers());
         return props;
     }
 }
